@@ -208,10 +208,10 @@ __run_post_install() {
   local getRunStatus=0
   local named_user named_group rnd_key
   __does_container_exist dns && return
+  named_group="$(grep -s 'named' /etc/group | head -n1 | grep '^' || grep -s 'bind' /etc/group | head -n1 | grep '^' || echo 'root')"
+  named_user="$(grep -s 'named' /etc/passwd | head -n1 | grep '^' || grep -s 'bind' /etc/passwd | head -n1 | grep '^' || echo 'root')"
   rndc_key="$(grep -s 'key "rndc-key" ' /etc/named.conf | grep -v 'KEY_RNDC' | sed 's|.*secret ||g;s|"||g;s|;.*||g' | grep '^')"
   tsig_key="$(tsig-keygen -a hmac-sha256 | grep 'secret' | sed 's|.*secret "||g;s|"||g;s|;||g' | grep '^' || echo 'wp/HApbthaVPjwqgp6ziLlmnkyLSNbRTehkdARBDcpI=')"
-  named_group="$(grep -qs 'named' /etc/group || grep -qs 'bind' /etc/group || echo 'root')"
-  named_user="$(grep -qs 'named' /etc/passwd || grep -qs 'bind' /etc/passwd || echo 'root')"
   __mkdir /etc/named /var/named/dynamic /var/named/data /var/named/stats /var/log/named
   __cp_rf "$APPDIR/etc/." "/etc/"
   __cp_rf "$APPDIR/usr/." "/usr/"
