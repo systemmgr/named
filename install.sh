@@ -220,8 +220,8 @@ __run_post_install() {
   printf '%s\n%s\n' "# rndc keys" 'key "rndc-key" { algorithm hmac-sha256; secret "'${rndc_key:-$tsig_key}'"' >"/etc/named/rndc.key"
   chattr -i /etc/resolv.conf && printf '%s\n%s\n%s\n%s\n' '# DNS Resolver' 'search casjay.in' 'nameserver 127.0.0.1' 'nameserver 1.1.1.1' >"/etc/resolv.conf" && chattr +i /etc/resolv.conf
   [ -e "/etc/rndc.key" ] && __ln "/etc/named/rndc.key" "/etc/rndc.key"
-  __ln /etc/named/named.conf /etc/named.conf
-  chown -Rf $named_user:$named_group /etc/named /etc/named.conf /var/named /var/log/named
+  [ -e "/etc/named.conf" ] && __ln "/etc/named/named.conf" "/etc/named.conf"
+  chown -Rfv $named_user:$named_group /etc/named /etc/named.conf /var/named /var/log/named >&3
   __service_exists named && systemctl enabled --now named &>/dev/null
   __service_is_active named && systemctl restart named &>/dev/null
   return $getRunStatus
