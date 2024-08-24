@@ -35,15 +35,12 @@ SCRIPT_SRC_DIR="${BASH_SOURCE%/*}"
 export SCRIPTS_PREFIX="systemmgr"
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 REPO_BRANCH="${GIT_REPO_BRANCH:-main}"
-PLUGIN_DIR="$HOME/.local/share/$APPNAME/plugins"
 REPO="https://github.com/$SCRIPTS_PREFIX/$APPNAME"
-INSTDIR="$HOME/.local/share/CasjaysDev/$SCRIPTS_PREFIX/$APPNAME"
 REPORAW="https://github.com/$SCRIPTS_PREFIX/$APPNAME/raw/$REPO_BRANCH"
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-APPDIR="$HOME/.config/$APPNAME"
-PLUGIN_DIR="$HOME/.local/share/$APPNAME/plugins"
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-BUILD_NAME="$APPNAME"
+INSTDIR="/usr/local/share/CasjaysDev/$SCRIPTS_PREFIX/$APPNAME"
+APPDIR="/usr/local/share/CasjaysDev/$SCRIPTS_PREFIX/$APPNAME"
+PLUGIN_DIR="/usr/local/share/$SCRIPTS_PREFIX/$APPNAME/plugins"
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Set bash options
 trap 'retVal=$?;trap_exit' ERR EXIT SIGINT
@@ -82,6 +79,7 @@ __mkdir() { mkdir -p "$1" &>/dev/null || return 1; }
 __app_is_running() { pidof "$1" &>/dev/null || return 1; }
 __mv_f() { [ -e "$1" ] && mv -f "$@" &>/dev/null || return 1; }
 __cp_rf() { [ -e "$1" ] && cp -Rfa "$@" &>/dev/null || return 1; }
+__ln() { [ -e "$1" ] && ln -sf "$1" "$2" &>/dev/null || return 1; }
 __chmod() { [ -e "$2" ] && chmod -Rf "$@" 2>/dev/null || return 1; }
 __replace_one() { $sed -i "s|$1|$2|g" "$3" &>/dev/null || return 1; }
 __rm_rf() { [ -e "$1" ] && { rm -Rf "$@" &>/dev/null || return 1; } || true; }
@@ -89,7 +87,8 @@ __rm_link() { [ -e "$1" ] && { rm -rf "$1" &>/dev/null || return 1; } || true; }
 __download_file() { curl -q -LSsf "$1" -o "$2" 2>/dev/null || return 1; }
 __input_is_number() { test -n "$1" && test -z "${1//[0-9]/}" || return 1; }
 __failexitcode() { [ $1 -ne 0 ] && printf_red "😠 $2 😠" && exit ${1:-4}; }
-__get_exit_status() { s=$? && getRunStatus=$((s + ${getRunStatus:-0})) && return $s; }
+__get_exit_status() { local s=$? && getRunStatus=$((s + ${getRunStatus:-0})) && return $s; }
+__service_exists() { systemctl list-unit-files | grep "^$1" || return 1; }
 __service_is_running() { systemctl is-active $1 2>&1 | grep -qiw 'active' || return 1; }
 __service_is_active() { systemctl is-enabled $1 2>&1 | grep -qiw 'enabled' || return 1; }
 __get_version() { echo "$@" | awk -F '.' '{ printf("%d%d%d%d\n", $1,$2,$3,$4) }'; }
@@ -101,8 +100,10 @@ __dir_count() { find -L "${1:-./}" -maxdepth "${2:-1}" -not -path "${1:-./}/.git
 __file_count() { find -L "${1:-./}" -maxdepth "${2:-1}" -not -path "${1:-./}/.git/*" -type f 2>/dev/null | wc -l; }
 __kill_process_id() { __input_is_number $1 && pid=$1 && { [ -z "$pid" ] || kill -15 $pid &>/dev/null; } || return 1; }
 __kill() { __kill_process_id "$1" || __kill_process_name "$1" || { ! __app_is_running "$1" || kill -9 $pid &>/dev/null; } || return 1; }
+__port_in_use() { netstat -tauln 2>&1 | grep ' LISTEN' | awk -F' ' '{print $4}' | awk -F':' '{print $NF}' | sort -u | grep -q "^$1$" || return 2; }
 __replace_all() { [ -n "$3" ] && [ -e "$3" ] && find "$3" -not -path "$3/.git/*" -type f -exec $sed -i "s|$1|$2|g" {} \; >/dev/null 2>&1 || return 1; }
 __kill_process_name() { local pid="$(pidof "$1" 2>/dev/null)" && { [ -z "$pid" ] || { kill -19 $pid &>/dev/null && ! __app_is_running "$1" && return 0; } || kill -9 $pid &>/dev/null; } || return 1; }
+__does_container_exist() { [ -n "$(command -v docker 2>/dev/null)" ] && docker ps -a | awk '{print $NF}' | grep -v '^NAMES$' | grep -q "$1" || return 1; }
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 sed="$(builtin type -P gsed 2>/dev/null || builtin type -P sed 2>/dev/null || return)"
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -113,7 +114,7 @@ show_optvars "$@"
 verify_url "$REPO"
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # OS Support: supported_os unsupported_oses
-supported_os linux mac windows
+supported_os linux
 unsupported_oses
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # get sudo credentials
@@ -205,13 +206,16 @@ __run_prepost_install() {
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # run after primary post install function
 __run_post_install() {
-  local getRunStatus=0 named_user named_group
+  local getRunStatus=0
+  __does_container_exist dns && return
+  local named_user named_group
   named_group="$(grep -qs 'named' /etc/group || grep -qs 'bind' /etc/group || echo 'root')"
   named_user="$(grep -qs 'named' /etc/passwd || grep -qs 'bind' /etc/passwd || echo 'root')"
   __cp_rf "$APPDIR/etc/." "/etc/"
   ln -sf /etc/named/named.conf /etc/named.conf
   __mkdir /etc/named /var/named/dynamic /var/named/data /var/named/stats /var/log/named
   chown -Rf $named_user:$named_group /etc/named /var/named /var/log/named
+  __service_is_active named && systemctl restart named &>/dev/null
   return $getRunStatus
 }
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
