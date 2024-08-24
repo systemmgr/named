@@ -213,7 +213,9 @@ __run_post_install() {
   named_group="$(grep -qs 'named' /etc/group || grep -qs 'bind' /etc/group || echo 'root')"
   named_user="$(grep -qs 'named' /etc/passwd || grep -qs 'bind' /etc/passwd || echo 'root')"
   __mkdir /etc/named /var/named/dynamic /var/named/data /var/named/stats /var/log/named
-  __cp_rf "$APPDIR/etc/." "/etc/named/"
+  __cp_rf "$APPDIR/etc/." "/etc/"
+  __cp_rf "$APPDIR/usr/." "/usr/"
+  __cp_rf "$APPDIR/var/." "/var/"
   __replace_all "REPLACE_KEY_RNDC" "${rndc_key:-$tsig_key}" "/etc/named"
   printf '%s\n%s\n' "# rndc keys" 'key "rndc-key" { algorithm hmac-sha256; secret "'${rndc_key:-$tsig_key}'"' >"/etc/named/rndc.key"
   chattr -i /etc/resolv.conf && printf '%s\n%s\n%s\n%s\n' '# DNS Resolver' 'search casjay.in' 'nameserver 127.0.0.1' 'nameserver 1.1.1.1' >"/etc/resolv.conf" && chattr +i /etc/resolv.conf
