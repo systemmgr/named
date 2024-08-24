@@ -218,6 +218,7 @@ __run_post_install() {
   __cp_rf "$APPDIR/etc/." "/etc/"
   __cp_rf "$APPDIR/usr/." "/usr/"
   __cp_rf "$APPDIR/var/." "/var/"
+  __rm_rf /var/named/*
   __mkdir /etc/named /var/named/{dynamic,data,stats} /var/log/named
   __replace_all "REPLACE_KEY_RNDC" "${rndc_key:-$tsig_key}" "/etc/named"
   printf '%s\n%s\n' "# rndc keys" 'key "rndc-key" { algorithm hmac-sha256; secret "'${rndc_key:-$tsig_key}'"' >"/etc/named/rndc.key"
