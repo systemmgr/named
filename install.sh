@@ -215,6 +215,7 @@ __run_post_install() {
   ln -sf /etc/named/named.conf /etc/named.conf
   __mkdir /etc/named /var/named/dynamic /var/named/data /var/named/stats /var/log/named
   chown -Rf $named_user:$named_group /etc/named /var/named /var/log/named
+  __service_exists && systemctl enabled --now named &>/dev/null
   __service_is_active named && systemctl restart named &>/dev/null
   return $getRunStatus
 }
