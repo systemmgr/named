@@ -105,6 +105,9 @@ __replace_all() { [ -n "$3" ] && [ -e "$3" ] && find "$3" -not -path "$3/.git/*"
 __kill_process_name() { local pid="$(pidof "$1" 2>/dev/null)" && { [ -z "$pid" ] || { kill -19 $pid &>/dev/null && ! __app_is_running "$1" && return 0; } || kill -9 $pid &>/dev/null; } || return 1; }
 __does_container_exist() { [ -n "$(command -v docker 2>/dev/null)" ] && docker ps -a | awk '{print $NF}' | grep -v '^NAMES$' | grep -q "$1" || return 1; }
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+__get_user_name() { grep ':' /etc/passwd | awk -F ':' '{print $1}' | sort -u | grep "^${1:-root}$"; }
+__get_user_group() { grep ':' /etc/group | awk -F ':' '{print $1}' | sort -u | grep "^${1:-root}$"; }
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 sed="$(builtin type -P gsed 2>/dev/null || builtin type -P sed 2>/dev/null || return)"
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Script options IE: --help --version
@@ -208,8 +211,8 @@ __run_post_install() {
   local getRunStatus=0
   local named_user named_group rnd_key
   __does_container_exist dns && return
-  named_group="$(grep -s 'named' /etc/group | head -n1 | grep '^' || grep -s 'bind' /etc/group | head -n1 | grep '^' || echo 'root')"
-  named_user="$(grep -s 'named' /etc/passwd | head -n1 | grep '^' || grep -s 'bind' /etc/passwd | head -n1 | grep '^' || echo 'root')"
+  named_user="$(__get_user_name "named" || __get_user_name "bind" || echo 'root')"
+  named_group="$(__get_user_group "named" || __get_user_group "bind" || echo 'root')"
   rndc_key="$(grep -s 'key "rndc-key" ' /etc/named.conf | grep -v 'KEY_RNDC' | sed 's|.*secret ||g;s|"||g;s|;.*||g' | grep '^')"
   tsig_key="$(tsig-keygen -a hmac-sha256 | grep 'secret' | sed 's|.*secret "||g;s|"||g;s|;||g' | grep '^' || echo 'wp/HApbthaVPjwqgp6ziLlmnkyLSNbRTehkdARBDcpI=')"
   named_user="${named_user//:*/}"
