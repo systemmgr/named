@@ -208,8 +208,9 @@ __run_post_install() {
   local getRunStatus=0 named_user named_group
   named_group="$(grep -qs 'named' /etc/group || grep -qs 'bind' /etc/group || echo 'root')"
   named_user="$(grep -qs 'named' /etc/passwd || grep -qs 'bind' /etc/passwd || echo 'root')"
+  __cp_rf "$APPDIR/etc/." "/etc/"
   ln -sf /etc/named/named.conf /etc/named.conf
-  __mkdir /var/named/dynamic /var/named/data /var/named/stats /var/log/named
+  __mkdir /etc/named /var/named/dynamic /var/named/data /var/named/stats /var/log/named
   chown -Rf $named_user:$named_group /etc/named /var/named /var/log/named
   return $getRunStatus
 }
