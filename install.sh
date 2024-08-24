@@ -139,7 +139,6 @@ systemmgr_run_init
 #installer_noupdate "$@"
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Defaults
-APPNAME="named"
 APPVERSION="$(__appversion "https://github.com/$SCRIPTS_PREFIX/$APPNAME/raw/$REPO_BRANCH/version.txt")"
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Define these if build script is used
@@ -239,8 +238,8 @@ __run_build_script() {
 }
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Other dependencies
-dotfilesreq misc
-dotfilesreqadmin cron
+dotfilesreq
+dotfilesreqadmin
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # END OF CONFIGURATION
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
