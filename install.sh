@@ -207,14 +207,20 @@ __run_prepost_install() {
 __run_post_install() {
   local getRunStatus=0
   __does_container_exist dns && return
-  local named_user named_group
+  local named_user named_group rnd_key
+  rndc_key="$(grep -s 'key "rndc-key" ' /etc/named.conf | grep -v 'KEY_RNDC' | sed 's|.*secret ||g;s|"||g;s|;.*||g' | grep '^')"
+  tsig_key="$(tsig-keygen -a hmac-sha256 | grep 'secret' | sed 's|.*secret "||g;s|"||g;s|;||g' | grep '^' || echo 'wp/HApbthaVPjwqgp6ziLlmnkyLSNbRTehkdARBDcpI=')"
   named_group="$(grep -qs 'named' /etc/group || grep -qs 'bind' /etc/group || echo 'root')"
   named_user="$(grep -qs 'named' /etc/passwd || grep -qs 'bind' /etc/passwd || echo 'root')"
-  __cp_rf "$APPDIR/etc/." "/etc/"
-  ln -sf /etc/named/named.conf /etc/named.conf
   __mkdir /etc/named /var/named/dynamic /var/named/data /var/named/stats /var/log/named
-  chown -Rf $named_user:$named_group /etc/named /var/named /var/log/named
-  __service_exists && systemctl enabled --now named &>/dev/null
+  __cp_rf "$APPDIR/etc/." "/etc/named/"
+  __replace_all "REPLACE_KEY_RNDC" "${rndc_key:-$tsig_key}" "/etc/named"
+  printf '%s\n%s\n' "# rndc keys" 'key "rndc-key" { algorithm hmac-sha256; secret "'${rndc_key:-$tsig_key}'"' >"/etc/named/rndc.key"
+  chattr -i /etc/resolv.conf && printf '%s\n%s\n%s\n' '# DNS Resolver' 'search casjay.in' 'nameserver 127.0.0.1' >"/etc/resolv.conf" && chattr +i /etc/resolv.conf
+  [ -f "/etc/rndc.key" ] && __ln "/etc/named/rndc.key" "/etc/rndc.key"
+  __ln /etc/named/named.conf /etc/named.conf
+  chown -Rf $named_user:$named_group /etc/named /etc/named.conf /var/named /var/log/named
+  __service_exists named && systemctl enabled --now named &>/dev/null
   __service_is_active named && systemctl restart named &>/dev/null
   return $getRunStatus
 }
